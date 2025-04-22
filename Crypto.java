@@ -46,18 +46,36 @@ public class Crypto {
         return true;
     }
 
+    /**
+     * Generates a valid generator for the given prime p.
+     * @param bits Approximate bit length for generator (unused in optimized version).
+     * @param p Prime modulus.
+     * @return A valid generator g such that g is a primitive root modulo p.
+     */
     public static BigInteger getGenerator(int bits, BigInteger p) {
-        BigInteger g = getRandom(bits - 1, bits);
-        while (g.compareTo(p) < 0) {
-            if (isValidG(g, p)) return g;
-            g = g.add(BigInteger.ONE);
+        // Try small generators first (common in DHE)
+        BigInteger[] smallGenerators = {
+            BigInteger.valueOf(2), BigInteger.valueOf(3), BigInteger.valueOf(5), BigInteger.valueOf(7)
+        };
+        for (BigInteger g : smallGenerators) {
+            if (g.compareTo(p) < 0 && isValidG(g, p)) {
+                return g;
+            }
         }
-        return null;
+        // Fallback to random search with limited attempts
+        int maxAttempts = 100;
+        for (int i = 0; i < maxAttempts; i++) {
+            BigInteger g = getRandom(2, p.bitLength() - 1);
+            if (g.compareTo(p) < 0 && isValidG(g, p)) {
+                return g;
+            }
+        }
+        throw new ArithmeticException("No valid generator found for p = " + p);
     }
 
     public static BigInteger getRandom(int minBits, int maxBits) {
         BigInteger result = new BigInteger(maxBits, Rand.getRand());
-        while (result.bitLength() <= minBits) {
+        while (result.bitLength() <= minBits || result.equals(BigInteger.ZERO)) {
             result = new BigInteger(maxBits, Rand.getRand());
         }
         return result;

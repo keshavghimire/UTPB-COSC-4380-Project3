@@ -32,9 +32,12 @@ public class RSA {
      */
     public String encrypt(String message, BigInteger[] pubKey) {
         try {
+            if (message == null || pubKey == null || pubKey.length != 2) {
+                throw new IllegalArgumentException("Invalid input: message or public key is null or incomplete");
+            }
             byte[] messageBytes = message.getBytes("UTF-8");
             
-            // For simplicity, we'll just use the hash of the message if it's too large
+            // Hash message if too large for RSA modulus
             if (new BigInteger(1, messageBytes).compareTo(pubKey[1]) >= 0) {
                 MessageDigest md = MessageDigest.getInstance("SHA-256");
                 messageBytes = md.digest(messageBytes);
@@ -73,6 +76,9 @@ public class RSA {
      */
     public String sign(String message) {
         try {
+            if (message == null) {
+                throw new IllegalArgumentException("Invalid input: message is null");
+            }
             // Hash the message to ensure it fits within the RSA key size
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             byte[] messageHash = md.digest(message.getBytes("UTF-8"));
@@ -92,8 +98,8 @@ public class RSA {
      */
     public boolean verify(String message, String signature, BigInteger[] pubKey) {
         try {
-            if (signature == null) {
-                System.out.println("[Verification error: null signature]");
+            if (message == null || signature == null || pubKey == null || pubKey.length != 2) {
+                System.out.println("[Verification error: null message, signature, or public key]");
                 return false;
             }
             
@@ -151,7 +157,7 @@ public class RSA {
         System.out.printf("Signed by A (signature): %s%n", signature1);
         
         // A encrypts the message with B's public key
-        String encryptedMessage1 = b.encrypt(message1, bPub);
+        String encryptedMessage1 = a.encrypt(message1, bPub);
         System.out.printf("Encrypted message sent to B: %s%n", encryptedMessage1);
         
         // B decrypts the message using B's private key
@@ -162,7 +168,7 @@ public class RSA {
         System.out.printf("Signature sent to B: %s%n", signature1);
         
         // B verifies the signature using A's public key
-        boolean isValid1 = a.verify(decryptedMessage1, signature1, aPub);
+        boolean isValid1 = b.verify(decryptedMessage1, signature1, aPub);
         System.out.printf("Message authenticated by B: %s%n", isValid1);
 
         // B sends a message to A
@@ -174,7 +180,7 @@ public class RSA {
         System.out.printf("Signed by B (signature): %s%n", signature2);
         
         // B encrypts the message with A's public key
-        String encryptedMessage2 = a.encrypt(message2, aPub);
+        String encryptedMessage2 = b.encrypt(message2, aPub);
         System.out.printf("Encrypted message sent to A: %s%n", encryptedMessage2);
         
         // A decrypts the message using A's private key
@@ -185,7 +191,7 @@ public class RSA {
         System.out.printf("Signature sent to A: %s%n", signature2);
         
         // A verifies the signature using B's public key
-        boolean isValid2 = b.verify(decryptedMessage2, signature2, bPub);
+        boolean isValid2 = a.verify(decryptedMessage2, signature2, bPub);
         System.out.printf("Message authenticated by A: %s%n", isValid2);
     }
 }
