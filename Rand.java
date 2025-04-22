@@ -39,7 +39,10 @@ public class Rand {
 
     public static boolean[] randBits(int len) {
         boolean[] bits = new boolean[len];
-        return null;
+        for (int i = 0; i < len; i++) {
+            bits[i] = rand.nextBoolean();
+        }
+        return bits;
     }
 
     public static int randInt(int min, int max) {

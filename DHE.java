@@ -11,16 +11,14 @@ public class DHE {
      * <p>Member variable for the generator parameter.</p>
      * <p><b>Do not leave this public</b></p>
      */
-    public BigInteger generator;
-    // TODO
+    private BigInteger generator;
 
     /**
      * <h3>prime</h3>
      * <p>Member variable for the prime parameter.</p>
      * <p><b>Do not leave this public</b></p>
      */
-    public BigInteger prime;
-    // TODO
+    private BigInteger prime;
 
     /**
      * <h3>DHE Constructor</h3>
@@ -31,7 +29,8 @@ public class DHE {
      * @param pBits The number of bits to target for the prime modulus
      */
     public DHE(int gBits, int pBits) {
-        // TODO
+        prime = Crypto.getSafePrime();  // Safe prime of size ≥2048 bits
+        generator = Crypto.getGenerator(gBits, prime);  // Valid primitive root mod p
     }
 
     /**
@@ -41,8 +40,7 @@ public class DHE {
      * @return The generated base value
      */
     public BigInteger getBase(int bits) {
-        // TODO
-        return null;
+        return Crypto.getRandom(bits - 1, bits).mod(prime);
     }
 
     /**
@@ -52,8 +50,8 @@ public class DHE {
      * @return The result of g^b mod p using our fast modular exponentiation method
      */
     public BigInteger getExponent(BigInteger base) {
-        // TODO
-        return null;
+        BigInteger secret = Crypto.getRandom(256, 512); // Simulating a private value
+        return Crypto.fastMod(base, secret, prime);
     }
 
     /**
@@ -64,8 +62,7 @@ public class DHE {
      * @return The result of E^b mod p using our fast modular exponentiation method
      */
     public BigInteger getKey(BigInteger base, BigInteger exponent) {
-        // TODO
-        return null;
+        return Crypto.fastMod(base, exponent, prime);
     }
 
     /**
@@ -76,29 +73,35 @@ public class DHE {
     public static void main(String[] args) {
         DHE d = new DHE(512, 2048);
         System.out.printf("g = %s%np = %s%n%n", d.generator, d.prime);
+
         BigInteger a = d.getBase(512);
         BigInteger b = d.getBase(512);
         System.out.printf("a = %s%nb = %s%n%n", a, b);
+
         BigInteger A = d.getExponent(a);
         BigInteger B = d.getExponent(b);
         System.out.printf("A = %s%nB = %s%n%n", A, B);
+
         BigInteger aKey = d.getKey(a, B);
         BigInteger bKey = d.getKey(b, A);
-        System.out.printf("keys = %s%n%s", aKey, bKey);
+        System.out.printf("keys = %s%n%s%n%n", aKey, bKey);
 
         DHE e = new DHE(512, 2048);
-        System.out.printf("g = %s%np = %s%n%n", d.generator, d.prime);
+        System.out.printf("g = %s%np = %s%n%n", e.generator, e.prime);
+
         BigInteger x = e.getBase(512);
         BigInteger y = e.getBase(512);
         BigInteger z = e.getBase(512);
         System.out.printf("x = %s%ny = %s%nz = %s%n%n", x, y, z);
+
         BigInteger X = e.getExponent(x);
         BigInteger Y = e.getExponent(y);
         BigInteger Z = e.getExponent(z);
         System.out.printf("X = %s%nY = %s%nZ = %s%n%n", X, Y, Z);
+
         BigInteger xKey = e.getKey(x, e.getKey(y, Z));
         BigInteger yKey = e.getKey(y, e.getKey(z, X));
         BigInteger zKey = e.getKey(z, e.getKey(x, Y));
-        System.out.printf("keys = %s%n%s%n%s", xKey, yKey, zKey);
+        System.out.printf("keys = %s%n%s%n%s%n", xKey, yKey, zKey);
     }
 }

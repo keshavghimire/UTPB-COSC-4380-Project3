@@ -1,113 +1,165 @@
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Base64;
 
 public class AES {
-
-    private int[] keySchedule;
-
-    private static final HashMap<Integer, Integer> RC = new HashMap<>();
-    static {
-        RC.put(1, 0x01);
-        RC.put(2, 0x02);
-        RC.put(3, 0x04);
-        RC.put(4, 0x08);
-        RC.put(5, 0x10);
-        RC.put(6, 0x20);
-        RC.put(7, 0x40);
-        RC.put(8, 0x80);
-        RC.put(9, 0x1B);
-        RC.put(10, 0x36);
-    }
+    private static final int BLOCK_SIZE = 4;
+    private static final int N = 10; // AES-128 uses 10 rounds
+    private int[][][] roundKey = new int[N + 1][BLOCK_SIZE][BLOCK_SIZE];
 
     public AES(String key) {
-        keyExpansion(key);
+        int[] keyBytes = new int[16];
+        byte[] raw = key.getBytes();
+        for (int i = 0; i < 16; i++) {
+            keyBytes[i] = raw[i] & 0xFF;
+        }
+        keyExpansion(keyBytes);
     }
 
     public String encrypt(String plaintext, boolean cbcMode) {
-        cipher(, true);
+        int[][] block = textToBlock(plaintext);
+        cipher(block, true);
+        byte[] raw = blockToBytes(block);
+        return Base64.getEncoder().encodeToString(raw); // return as printable Base64
     }
 
     public String decrypt(String ciphertext, boolean cbcMode) {
-        cipher(, false);
+        byte[] raw = Base64.getDecoder().decode(ciphertext);
+        int[][] block = bytesToBlock(raw);
+        cipher(block, false);
+        return blockToText(block);
     }
 
-    public String cipher(int[][] block, boolean encryptMode) {
+    public void cipher(int[][] block, boolean encryptMode) {
         if (encryptMode) {
-            addRoundKey(block, roundkey[0]);
-
+            addRoundKey(block, roundKey[0]);
             for (int round = 1; round < N; round++) {
-                subBytes(block, encryptMode);
-                shiftRows(block, encryptMode);
-                mixColumns(block, encryptMode);
+                subBytes(block, true);
+                shiftRows(block, true);
+                mixColumns(block, true);
                 addRoundKey(block, roundKey[round]);
             }
-
-            subBytes(block, encryptMode);
-            shiftRows(block, encryptMode);
+            subBytes(block, true);
+            shiftRows(block, true);
             addRoundKey(block, roundKey[N]);
         } else {
             addRoundKey(block, roundKey[N]);
-            shiftRows(block, encryptMode);
-            subBytes(block, encryptMode);
-
-            for (int round = 1; round < N; round++) {
-                addRoundKey(block, roundKey[N - round - 1]);
-                mixColumns(block, encryptMode);
-                shiftRows(block, encryptMode);
-                subBytes(block, encryptMode);
+            shiftRows(block, false);
+            subBytes(block, false);
+            for (int round = N - 1; round > 0; round--) {
+                addRoundKey(block, roundKey[round]);
+                mixColumns(block, false);
+                shiftRows(block, false);
+                subBytes(block, false);
             }
-
-            addRoundKey(block, roundkey[0]);
+            addRoundKey(block, roundKey[0]);
         }
     }
 
-    private byte[][] getBlock(String text, int blockIdx) {
+    private int[][] textToBlock(String text) {
+        int[][] block = new int[BLOCK_SIZE][BLOCK_SIZE];
+        byte[] bytes = Arrays.copyOf(text.getBytes(), 16);
+        for (int i = 0; i < 16; i++) {
+            block[i % 4][i / 4] = bytes[i] & 0xFF;
+        }
+        return block;
+    }
 
+    private String blockToText(int[][] block) {
+        byte[] result = new byte[16];
+        for (int i = 0; i < 16; i++) {
+            result[i] = (byte) block[i % 4][i / 4];
+        }
+        return new String(result);
+    }
+
+    private byte[] blockToBytes(int[][] block) {
+        byte[] result = new byte[16];
+        for (int i = 0; i < 16; i++) {
+            result[i] = (byte) block[i % 4][i / 4];
+        }
+        return result;
+    }
+
+    private int[][] bytesToBlock(byte[] bytes) {
+        int[][] block = new int[4][4];
+        for (int i = 0; i < 16; i++) {
+            block[i % 4][i / 4] = bytes[i] & 0xFF;
+        }
+        return block;
     }
 
     private void keyExpansion(int[] key) {
-
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                roundKey[0][j][i] = key[i * 4 + j];
+            }
+        }
+        for (int round = 1; round <= N; round++) {
+            for (int i = 0; i < 4; i++) {
+                int[] word = new int[4];
+                if (i == 0) {
+                    for (int j = 0; j < 4; j++) {
+                        word[j] = roundKey[round - 1][j][3];
+                    }
+                    word = rotWord(word);
+                    for (int j = 0; j < 4; j++) {
+                        word[j] = SBox.sbox(word[j]);
+                    }
+                    word[0] ^= Crypto.RC.get(round);
+                } else {
+                    for (int j = 0; j < 4; j++) {
+                        word[j] = roundKey[round][j][i - 1];
+                    }
+                }
+                for (int j = 0; j < 4; j++) {
+                    roundKey[round][j][i] = roundKey[round - 1][j][i] ^ word[j];
+                }
+            }
+        }
     }
 
     private int[] rotWord(int[] word) {
-        int[] rot = new int[4];
-        rot[0] = word[1];
-        rot[1] = word[2];
-        rot[2] = word[3];
-        rot[3] = word[0];
-        return rot;
+        return new int[]{word[1], word[2], word[3], word[0]};
     }
 
     private void subBytes(int[][] block, boolean mode) {
-        for(int r = 0; r < 4; r++) {
-            for(int c = 0; c < 4; c++) {
+        for (int r = 0; r < BLOCK_SIZE; r++) {
+            for (int c = 0; c < BLOCK_SIZE; c++) {
                 block[r][c] = mode ? SBox.sbox(block[r][c]) : SBox.invSbox(block[r][c]);
             }
         }
     }
 
     private void shiftRows(int[][] block, boolean mode) {
-        for (int r = 1; r < 4; r++) {
-            int[] temp = new int[4];
-            for (int c = 0; c < 4; c++) {
-                temp[c] = mode ? block[r][(c+r)%4] : block[r][(c-r)%4];
+        for (int r = 1; r < BLOCK_SIZE; r++) {
+            int[] temp = new int[BLOCK_SIZE];
+            for (int c = 0; c < BLOCK_SIZE; c++) {
+                temp[c] = mode ? block[r][(c + r) % BLOCK_SIZE] : block[r][(c - r + BLOCK_SIZE) % BLOCK_SIZE];
             }
             block[r] = temp;
         }
     }
 
     private void mixColumns(int[][] block, boolean mode) {
-
+        // Placeholder for mixColumns and invMixColumns logic
     }
 
     private void addRoundKey(int[][] block, int[][] roundKey) {
-        for (int r = 0; r < 4; r++) {
-            for (int c = 0; c < 4; c++) {
-                block[r][c] = block[r][c] ^ roundKey[r][c];
+        for (int r = 0; r < BLOCK_SIZE; r++) {
+            for (int c = 0; c < BLOCK_SIZE; c++) {
+                block[r][c] ^= roundKey[r][c];
             }
         }
     }
 
     public static void main(String[] args) {
-        AES aes = new AES();
+        AES aes = new AES("thisIsASecretKey");
+        String plaintext = "Hello AES World!";
+        String encrypted = aes.encrypt(plaintext, false);
+        String decrypted = aes.decrypt(encrypted, false);
+
+        System.out.println("Plaintext : " + plaintext);
+        System.out.println("Encrypted : " + encrypted);
+        System.out.println("Decrypted : " + decrypted);
     }
 }
